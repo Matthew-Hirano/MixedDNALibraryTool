@@ -272,8 +272,8 @@ func solved():
 	#await get_tree().create_timer(1.1).timeout
 	
 func _unhandled_input(_event: InputEvent) -> void:
-	if Input.is_action_just_pressed(\"backspace\"):
-		solved()
+	#if Input.is_action_just_pressed(\"backspace\"):
+	#	solved()
 	pass
 "
 
