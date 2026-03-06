@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="molarity_library_dilutions"
+run/main_scene="uid://csqui2dmhgmlo"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 boot_splash/show_image=false
 
