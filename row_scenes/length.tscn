@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3 uid="uid://scgsen0dkcp8"]
+
+[sub_resource type="GDScript" id="GDScript_vx8tf"]
+script/source = "extends LineEdit
+
+@export var row : int
+
+signal len_changed
+
+func _on_text_changed(_new_text: String) -> void:
+	len_changed.emit( self.row )
+"
+
+[node name="Sample" type="LineEdit"]
+custom_minimum_size = Vector2(0, 40)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+placeholder_text = "0"
+script = SubResource("GDScript_vx8tf")
+
+[connection signal="text_changed" from="." to="." method="_on_text_changed"]

@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://bkoan0a2rbb7q"
+path="res://.godot/imported/SYSTEM#2 (co_op_up_b).wav-d19f294a7812071aa52016c6277cf17d.sample"
+
+[deps]
+
+source_file="res://picross_scenes/sounds/SYSTEM#2 (co_op_up_b).wav"
+dest_files=["res://.godot/imported/SYSTEM#2 (co_op_up_b).wav-d19f294a7812071aa52016c6277cf17d.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

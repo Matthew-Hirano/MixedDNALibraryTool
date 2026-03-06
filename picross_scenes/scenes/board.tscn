@@ -1,0 +1,676 @@
+[gd_scene load_steps=22 format=3 uid="uid://du44id362y1u0"]
+
+[ext_resource type="PackedScene" uid="uid://bmwurr5jdf346" path="res://picross_scenes/scenes/cursor.tscn" id="1_p0ybc"]
+[ext_resource type="FontFile" uid="uid://t0ovx2qyuxxw" path="res://picross_scenes/images/square-deal.ttf" id="1_tngv2"]
+[ext_resource type="Shader" uid="uid://d1ue6b022k4qe" path="res://shaders/waves.gdshader" id="1_y7jp4"]
+[ext_resource type="AudioStream" uid="uid://tmvulhe7ag6l" path="res://picross_scenes/sounds/SYSTEM#475 (morgana).wav" id="2_mgc1s"]
+[ext_resource type="AudioStream" uid="uid://b3qoeypxldldp" path="res://picross_scenes/sounds/SYS.PBD_00026.wav" id="3_rq8yp"]
+[ext_resource type="Shader" uid="uid://dg3jvpkebxfjx" path="res://shaders/dither.gdshader" id="4_8415j"]
+[ext_resource type="AudioStream" uid="uid://53ovqrd0oqpd" path="res://picross_scenes/sounds/SYS.PBD_00008.wav" id="5_rq8yp"]
+[ext_resource type="AudioStream" uid="uid://dj6avp5toryp7" path="res://picross_scenes/sounds/maina8.dsp.wav" id="5_xhrpu"]
+[ext_resource type="AudioStream" uid="uid://bevsmx02ubm72" path="res://picross_scenes/sounds/Option Cancel.wav" id="7_5qf1t"]
+[ext_resource type="AudioStream" uid="uid://bkoan0a2rbb7q" path="res://picross_scenes/sounds/SYSTEM#2 (co_op_up_b).wav" id="8_lsnxj"]
+
+[sub_resource type="GDScript" id="GDScript_4mug4"]
+script/source = "extends Control
+
+@export var pre_image : Texture2D = load('res://picross_scenes/images/trex.png')
+@export var pre_color : Texture2D = load('res://picross_scenes/images/trex_color.png')
+@export var solution : String = 'FILLER'
+
+@onready var image = pre_image.get_image()
+@onready var color_image = pre_color.get_image()
+
+var tile : PackedScene = preload(\"res://picross_scenes/tile.tscn\")
+var hint : PackedScene = preload(\"res://picross_scenes/hint.tscn\")
+
+var tilesize = Controls.tilesize
+var rowhints : Array = []
+var colhints : Array = []
+var flip : bool = true
+var bgcolor1 = Color(1,1,1,1)
+var bgcolor2 = Color(0.9,0.9,0.9,1)
+
+var max_h : Array = []
+var max_v : Array = []
+
+var runningdelay : float = 0.0
+var color_array : Array
+
+func _process(_delta: float) -> void:
+	for child in get_node('PuzzleBox/UberContainer/TileContainer').get_children():
+		if child.target and !child.is_chiseled: #Board is not solved
+			return
+		elif !child.target and child.is_chiseled:
+			return
+	#Board is solved
+	solved()
+
+func _ready():
+	Controls.active = true
+	image.decompress()
+	#Determine the number of columns and rows, and generate the hints
+	var z : Array = _image_to_matrix(image)
+	color_array = _image_to_color(color_image)
+	for row in z:
+		var h = _row_to_hint(row)
+		rowhints.append(h)
+		max_h.append(len(h))
+	for col in _transposed_matrix(z):
+		var v = _col_to_hint(col)
+		colhints.append(v)
+		max_v.append(len(v))
+	#Populate the grid with tile and hint scenes
+	get_node('PuzzleBox/UberContainer/TileContainer').set_columns(len(z[0]))
+	get_node(\"PuzzleBox/UberContainer/Cursor\").tile_boundary = Vector2(len(z[0]),len(z)) * tilesize
+	get_node('PuzzleBox/UberContainer/HHintContainer/HHints').set_columns(max_h.max())
+	get_node('PuzzleBox/UberContainer/Cursor').up_boundary = -tilesize * max_v.max()
+	get_node('PuzzleBox/UberContainer/Cursor').left_boundary = -tilesize * max_h.max()
+	get_node('PuzzleBox/UberContainer/Filler/FillerBottom/HowToPlay').visible = true
+	get_node('PuzzleBox/UberContainer/Filler/FillerBottom/Buttons').visible = true
+	get_node('PuzzleBox/UberContainer/Filler/FillerBottom/Label').visible = false
+	get_node('PuzzleBox/UberContainer/Filler/FillerBottom/Label').text = solution
+	for y in range(len(z)):
+		#Add filler
+		var fill = hint.instantiate()
+		if flip:
+			fill.get_theme_stylebox(\"panel\").bg_color = bgcolor2
+		fill.get_theme_stylebox(\"panel\").corner_radius_top_left = 5
+		fill.get_theme_stylebox(\"panel\").corner_radius_bottom_left = 5
+		fill.inactive = true
+		get_node('PuzzleBox/UberContainer/HHintContainer/Filler').add_child(fill)
+		#Add row hints
+		for d in range(max_h.max()-len(rowhints[y])):
+			var h = hint.instantiate()
+			if flip:
+				h.get_theme_stylebox(\"panel\").bg_color = bgcolor2
+			h.inactive = true
+			get_node('PuzzleBox/UberContainer/HHintContainer/HHints').add_child(h)
+		for e in range(len(rowhints[y])):
+			var h = hint.instantiate()
+			if flip:
+				h.get_theme_stylebox(\"panel\").bg_color = bgcolor2
+			var hintnumbers : String = str(rowhints[y][e])
+			h.get_node('RichTextLabel').text = hintnumbers
+			get_node('PuzzleBox/UberContainer/HHintContainer/HHints').add_child(h)
+			h.erase_signal.connect(get_node('PuzzleBox/UberContainer/Cursor').on_erase_signal)
+			h.mark_signal.connect(get_node('PuzzleBox/UberContainer/Cursor').on_mark_signal)
+		if flip:
+			flip = false
+		else:
+			flip = true
+
+		#Add real tiles
+		for x in range(len(z[0])):
+			var q = tile.instantiate()
+			if (x+1) % 5 == 0:
+				#q.get_theme_stylebox(\"panel\").set_border_color(Color(1,1,1,1))
+				q.get_theme_stylebox(\"panel\").border_width_right = 2
+			elif (x) % 5 == 0:
+				q.get_theme_stylebox(\"panel\").border_width_left = 2
+			if (y) % 5 == 0:
+				q.get_theme_stylebox(\"panel\").border_width_top = 2
+			elif (y+1) % 5 == 0:
+				q.get_theme_stylebox(\"panel\").border_width_bottom = 2 
+			if z[y][x] == 1:
+				q.target = true
+			else:
+				q.target = false
+			get_node('PuzzleBox/UberContainer/TileContainer').add_child(q)
+			q.erase_signal.connect(get_node('PuzzleBox/UberContainer/Cursor').on_erase_signal)
+			q.mark_signal.connect(get_node('PuzzleBox/UberContainer/Cursor').on_mark_signal)
+			q.chisel_signal.connect(get_node('PuzzleBox/UberContainer/Cursor').on_chisel_signal)
+			q.fadein(runningdelay)
+			runningdelay += 0.004
+	#Add column hints
+	for x in range(len(z[0])):
+		var fill = hint.instantiate()
+		if flip:
+			fill.get_theme_stylebox(\"panel\").bg_color = bgcolor2
+		fill.get_theme_stylebox(\"panel\").corner_radius_top_left = 5
+		fill.get_theme_stylebox(\"panel\").corner_radius_top_right = 5
+		fill.inactive = true
+		get_node('PuzzleBox/UberContainer/VHintContainer/Filler').add_child(fill)
+		
+		var single_column = VBoxContainer.new()
+		single_column.add_theme_constant_override(\"separation\", 0)
+		get_node('PuzzleBox/UberContainer/VHintContainer/VHints').add_child(single_column)
+		
+		for j in range(max_v.max()-len(colhints[x])):
+			var h = hint.instantiate()
+			if flip:
+				h.get_theme_stylebox(\"panel\").bg_color = bgcolor2
+			h.inactive = true
+			get_node('PuzzleBox/UberContainer/VHintContainer/VHints').get_child(x).add_child(h)
+		for k in range(len(colhints[x])):
+			var h = hint.instantiate()
+			if flip:
+				h.get_theme_stylebox(\"panel\").bg_color = bgcolor2
+			var hintnumbers : String = str(colhints[x][k])
+			h.get_node('RichTextLabel').text = hintnumbers
+			get_node('PuzzleBox/UberContainer/VHintContainer/VHints').get_child(x).add_child(h)
+			h.erase_signal.connect(get_node('PuzzleBox/UberContainer/Cursor').on_erase_signal)
+			h.mark_signal.connect(get_node('PuzzleBox/UberContainer/Cursor').on_mark_signal)
+		if flip:
+			flip = false
+		else:
+			flip = true
+	$PuzzleBox.size.x = (len(z[0]) * tilesize) * 2
+	$PuzzleBox.size.y = (len(z) * tilesize) * 2
+	if get_parent() is Window:
+		get_parent().size = $PuzzleBox.size
+
+func _image_to_matrix( _image : Image ) -> Array:
+	#Takes a transparent, square .png and converts into a matrix
+	var matrix : Array = []
+	for y in _image.get_size().y:
+		var row : Array = []
+		for x in _image.get_size().x:
+			var current_pixel : Color = _image.get_pixel(x,y)
+			if current_pixel == Color(0,0,0,1):
+				row.append(1)
+			else:
+				row.append(0)
+		matrix.append(row)
+	return matrix
+	
+func _image_to_color( _image : Image ) -> Array:
+	#Takes a transparent, square .png and converts into a matrix
+	for y in _image.get_size().y:
+		for x in _image.get_size().x:
+			var current_pixel : Color = _image.get_pixel(x,y)
+			color_array.append(current_pixel)
+	return color_array
+	
+func _row_to_hint( row: Array ) -> Array:
+	#Takes the matrix of the image and produces hints for each row from top to bottom
+	var row_hint : Array = []
+	var i = row.find(1)
+	if i != -1:
+		var c : int = 0
+		while i < len(row):
+			if row[i] != 0:
+				c += 1
+				i += 1
+			else:
+				if c > 0:
+					row_hint.append(c)
+				c = 0
+				i += 1
+		if c > 0:
+			row_hint.append(c)
+	else:
+		row_hint.append(0)
+	return row_hint
+	
+func _transposed_matrix( matrix: Array ):
+	var transposed_array = []
+	for x in len(matrix[0]):
+		var new_array : Array = []
+		for row in matrix:
+			new_array.append(row[x])
+		transposed_array.append(new_array)
+	return transposed_array
+	
+func _col_to_hint( col : Array ) -> Array:
+	var col_hint : Array = []
+	var i : int = col.find(1)
+	if i != -1:
+		var c : int = 0
+		while i < len(col):
+			if col[i] != 0:
+				c += 1
+				i += 1
+			else:
+				if c > 0:
+					col_hint.append(c)
+				c = 0
+				i += 1
+		if c > 0:
+			col_hint.append(c)
+	else:
+		col_hint.append(0)
+	return col_hint
+
+func erase_hints() -> void:
+	for object in $PuzzleBox/UberContainer/TileContainer.get_children():
+		object.set_modulate(Color(1,1,1,1))
+	for container in $PuzzleBox/UberContainer/VHintContainer/VHints.get_children():
+		for object in container.get_children():
+			object.set_self_modulate(Color(1,1,1,1))
+	for object in $PuzzleBox/UberContainer/VHintContainer/Filler.get_children():
+		object.set_self_modulate(Color(1,1,1,1))
+	for object in $PuzzleBox/UberContainer/HHintContainer/HHints.get_children():
+		object.set_self_modulate(Color(1,1,1,1))
+	for object in $PuzzleBox/UberContainer/HHintContainer/Filler.get_children():
+		object.set_self_modulate(Color(1,1,1,1))
+
+func solved():
+	if Controls.active:
+		Controls.active = false
+		Controls.clicked = false
+		Controls.rightclicked = false
+		erase_hints()
+		get_node('SND/complete').play()
+		get_node('PuzzleBox/UberContainer/Cursor').visible = false
+		get_node('PuzzleBox/UberContainer/Filler/FillerBottom/HowToPlay').visible = false
+		get_node('PuzzleBox/UberContainer/Filler/FillerBottom/Buttons').visible = false
+		get_node('PuzzleBox/UberContainer/Filler/FillerBottom/Label').visible = true
+		for child in get_node('PuzzleBox/UberContainer/TileContainer').get_children():
+			if child.marked:
+				child.erase(false, false)
+		$PuzzleBox/UberContainer/Filler/Timer.paused = true
+		$PuzzleBox/UberContainer/Cursor.set_process_mode(PROCESS_MODE_DISABLED)
+		$PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/UNDO/Panel/Button.set_process_mode(PROCESS_MODE_DISABLED)
+		$PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/REDO/Panel/Button.set_process_mode(PROCESS_MODE_DISABLED)
+		$PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/CLEAR/Panel/Button.set_process_mode(PROCESS_MODE_DISABLED)
+		
+		runningdelay = 0.0
+		for r in $PuzzleBox/UberContainer/TileContainer.get_children():
+			if \"fadeout\" in r:
+				r.fadeout( runningdelay, color_array.pop_front())
+	#await get_tree().create_timer(1.1).timeout
+	
+func _unhandled_input(_event: InputEvent) -> void:
+	if Input.is_action_just_pressed(\"backspace\"):
+		solved()
+	pass
+"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ldet3"]
+shader = ExtResource("1_y7jp4")
+shader_parameter/bottom_color = Color(0.94902, 0.509804, 0.470588, 1)
+shader_parameter/top_color = Color(0, 0.705882, 0.992157, 1)
+shader_parameter/wave_amp = 0.155
+shader_parameter/wave_size = 1.0
+shader_parameter/wave_time_mul = 0.1
+shader_parameter/total_phases = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rq8yp"]
+bg_color = Color(0.948661, 0.508246, 0.469135, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="GDScript" id="GDScript_rq8yp"]
+script/source = "extends Panel
+
+@onready var time_elapsed = 0.0
+var paused = false
+
+func _process(delta: float):
+	if !paused:
+		time_elapsed += delta
+		
+		var mins = int(time_elapsed) / 60
+		var secs = int(time_elapsed) % 60
+		
+		$Label.set_text(str(\"%0*d\" % [2, mins]) + \":\" + str(\"%0*d\" % [2, secs]))
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vbmap"]
+bg_color = Color(0, 0.705882, 0.992157, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0, 0, 0, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lsnxj"]
+content_margin_left = 5.0
+bg_color = Color(0.99, 0.2871, 0.298815, 1)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0, 0, 0, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+expand_margin_left = 5.0
+expand_margin_top = 5.0
+expand_margin_right = 5.0
+expand_margin_bottom = 5.0
+shadow_color = Color(0.259294, 0.259294, 0.259294, 0.6)
+
+[sub_resource type="GDScript" id="GDScript_p4gd3"]
+script/source = "extends Button
+@onready var tile_container: GridContainer = $\"../../../../../../TileContainer\"
+@onready var cursor: Sprite2D = $\"../../../../../../Cursor\"
+
+func _on_pressed() -> void:
+	for i in tile_container.get_children():
+		if \"erase\" in i:
+			i.erase(false, false)
+			i.record = []
+	cursor.tile_record = []
+	cursor.trash_record = []
+	cursor.trash_tiles = []
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tngv2"]
+bg_color = Color(0, 0.705882, 0.992157, 1)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0, 0, 0, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+expand_margin_left = 5.0
+expand_margin_top = 5.0
+expand_margin_right = 5.0
+expand_margin_bottom = 5.0
+
+[sub_resource type="GDScript" id="GDScript_tngv2"]
+script/source = "extends Button
+
+@onready var cursor: Sprite2D = $\"../../../../../../Cursor\"
+
+func _on_pressed() -> void:
+	cursor._undo()
+"
+
+[sub_resource type="GDScript" id="GDScript_c4ttu"]
+script/source = "extends Button
+
+@onready var cursor: Sprite2D = $\"../../../../../../Cursor\"
+
+func _on_pressed() -> void:
+	cursor._redo()
+"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_q85tf"]
+shader = ExtResource("4_8415j")
+shader_parameter/texture_mode = 1
+shader_parameter/alpha_mode = 0
+shader_parameter/quantize_size = 0
+shader_parameter/snap_to_world = false
+shader_parameter/limit_subpixels = true
+shader_parameter/dither_enabled = true
+shader_parameter/dither_pattern = 1
+shader_parameter/levels = 6
+shader_parameter/contrast = 1.0
+shader_parameter/brightness = 0.0
+shader_parameter/average = 0.0
+shader_parameter/palette_mode = 0
+
+[node name="Board" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+size_flags_horizontal = 4
+size_flags_vertical = 4
+script = SubResource("GDScript_4mug4")
+
+[node name="PuzzleBox" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_right = 720.0
+offset_bottom = 720.0
+mouse_filter = 2
+
+[node name="bgColor" type="ColorRect" parent="PuzzleBox"]
+material = SubResource("ShaderMaterial_ldet3")
+layout_mode = 2
+
+[node name="UberContainer" type="GridContainer" parent="PuzzleBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 0
+theme_override_constants/v_separation = 0
+columns = 2
+
+[node name="Filler" type="VBoxContainer" parent="PuzzleBox/UberContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Timer" type="Panel" parent="PuzzleBox/UberContainer/Filler"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_rq8yp")
+script = SubResource("GDScript_rq8yp")
+
+[node name="Label" type="Label" parent="PuzzleBox/UberContainer/Filler/Timer"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -47.0
+offset_top = -32.5
+offset_right = 47.0
+offset_bottom = 32.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_fonts/font = ExtResource("1_tngv2")
+theme_override_font_sizes/font_size = 48
+text = "00:00"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="FillerBottom" type="VBoxContainer" parent="PuzzleBox/UberContainer/Filler"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+alignment = 1
+
+[node name="HowToPlay" type="RichTextLabel" parent="PuzzleBox/UberContainer/Filler/FillerBottom"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 0
+tooltip_text = "LEFT CLICK TO PAINT IN SQUARES
+RIGHT CLICK TO ERASE OR MARK SQAURES
+
+HINTS INDICATE THE NUMBER OF CONSECUTIVE SQUARES
+THAT SHOULD BE PAINTED IN EACH COLUMN OR ROW"
+theme_override_fonts/normal_font = ExtResource("1_tngv2")
+theme_override_styles/normal = SubResource("StyleBoxFlat_vbmap")
+bbcode_enabled = true
+text = "How to play"
+fit_content = true
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Buttons" type="HBoxContainer" parent="PuzzleBox/UberContainer/Filler/FillerBottom"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="CLEAR" type="Control" parent="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 6
+size_flags_vertical = 4
+
+[node name="Panel" type="Panel" parent="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/CLEAR"]
+layout_mode = 0
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_lsnxj")
+
+[node name="Button" type="Button" parent="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/CLEAR/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("1_tngv2")
+theme_override_font_sizes/font_size = 28
+text = "CLEAR"
+flat = true
+script = SubResource("GDScript_p4gd3")
+
+[node name="UNDO" type="Control" parent="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 6
+size_flags_vertical = 4
+
+[node name="Panel" type="Panel" parent="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/UNDO"]
+show_behind_parent = true
+layout_mode = 0
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_tngv2")
+
+[node name="Button" type="Button" parent="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/UNDO/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("1_tngv2")
+theme_override_font_sizes/font_size = 28
+shortcut_feedback = false
+text = "UNDO"
+flat = true
+script = SubResource("GDScript_tngv2")
+
+[node name="REDO" type="Control" parent="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 6
+size_flags_vertical = 4
+
+[node name="Panel" type="Panel" parent="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/REDO"]
+show_behind_parent = true
+layout_mode = 0
+offset_left = -32.0
+offset_top = -32.0
+offset_right = 32.0
+offset_bottom = 32.0
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_tngv2")
+
+[node name="Button" type="Button" parent="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/REDO/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("1_tngv2")
+theme_override_font_sizes/font_size = 28
+shortcut_feedback = false
+text = "REDO"
+flat = true
+script = SubResource("GDScript_c4ttu")
+
+[node name="Label" type="Label" parent="PuzzleBox/UberContainer/Filler/FillerBottom"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_fonts/font = ExtResource("1_tngv2")
+theme_override_font_sizes/font_size = 60
+text = "ANSWER"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="VHintContainer" type="VBoxContainer" parent="PuzzleBox/UberContainer"]
+layout_mode = 2
+size_flags_vertical = 10
+mouse_filter = 2
+theme_override_constants/separation = 0
+alignment = 2
+
+[node name="Filler" type="HBoxContainer" parent="PuzzleBox/UberContainer/VHintContainer"]
+layout_mode = 2
+size_flags_vertical = 10
+theme_override_constants/separation = 0
+
+[node name="VHints" type="HBoxContainer" parent="PuzzleBox/UberContainer/VHintContainer"]
+layout_mode = 2
+size_flags_vertical = 10
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="HHintContainer" type="HBoxContainer" parent="PuzzleBox/UberContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Filler" type="VBoxContainer" parent="PuzzleBox/UberContainer/HHintContainer"]
+layout_mode = 2
+size_flags_horizontal = 10
+size_flags_vertical = 0
+theme_override_constants/separation = 0
+alignment = 2
+
+[node name="HHints" type="GridContainer" parent="PuzzleBox/UberContainer/HHintContainer"]
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 0
+mouse_filter = 2
+theme_override_constants/h_separation = 0
+theme_override_constants/v_separation = 0
+
+[node name="TileContainer" type="GridContainer" parent="PuzzleBox/UberContainer"]
+clip_contents = true
+layout_mode = 2
+size_flags_horizontal = 2
+size_flags_vertical = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 0
+theme_override_constants/v_separation = 0
+columns = 4
+
+[node name="Cursor" parent="PuzzleBox/UberContainer" instance=ExtResource("1_p0ybc")]
+position = Vector2(90, 27)
+
+[node name="dither" type="ColorRect" parent="PuzzleBox"]
+visible = false
+material = SubResource("ShaderMaterial_q85tf")
+layout_mode = 2
+mouse_filter = 2
+
+[node name="SND" type="Node" parent="."]
+
+[node name="erase" type="AudioStreamPlayer" parent="SND"]
+stream = ExtResource("5_rq8yp")
+volume_db = -13.0
+
+[node name="chisel" type="AudioStreamPlayer" parent="SND"]
+stream = ExtResource("3_rq8yp")
+volume_db = -15.0
+
+[node name="mark" type="AudioStreamPlayer" parent="SND"]
+stream = ExtResource("2_mgc1s")
+volume_db = -13.0
+
+[node name="move" type="AudioStreamPlayer" parent="SND"]
+stream = ExtResource("5_xhrpu")
+volume_db = -16.0
+pitch_scale = 2.0
+
+[node name="wrong" type="AudioStreamPlayer" parent="SND"]
+stream = ExtResource("7_5qf1t")
+volume_db = -8.0
+
+[node name="complete" type="AudioStreamPlayer" parent="SND"]
+process_mode = 3
+stream = ExtResource("8_lsnxj")
+
+[connection signal="pressed" from="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/CLEAR/Panel/Button" to="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/CLEAR/Panel/Button" method="_on_pressed"]
+[connection signal="pressed" from="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/UNDO/Panel/Button" to="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/UNDO/Panel/Button" method="_on_pressed"]
+[connection signal="pressed" from="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/REDO/Panel/Button" to="PuzzleBox/UberContainer/Filler/FillerBottom/Buttons/REDO/Panel/Button" method="_on_pressed"]

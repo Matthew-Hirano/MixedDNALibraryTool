@@ -1,0 +1,492 @@
+[gd_scene load_steps=13 format=3 uid="uid://bmwurr5jdf346"]
+
+[ext_resource type="Texture2D" uid="uid://crm40y58ii325" path="res://picross_scenes/images/cursor.png" id="1_fsq4c"]
+[ext_resource type="Texture2D" uid="uid://ca5ogl31xw160" path="res://picross_scenes/images/marker.png" id="2_e4vdg"]
+[ext_resource type="Texture2D" uid="uid://dxfeq13rjehkq" path="res://picross_scenes/images/eraser.png" id="3_e4vdg"]
+[ext_resource type="Texture2D" uid="uid://bqqf6o275gp4f" path="res://picross_scenes/images/paint1.png" id="4_76ls5"]
+[ext_resource type="Texture2D" uid="uid://7rwsexjjnbgi" path="res://picross_scenes/images/paint2.png" id="5_qgq22"]
+
+[sub_resource type="GDScript" id="GDScript_ydl3m"]
+script/source = "extends Sprite2D
+
+var running_delta : float = 0.0
+
+@onready var boundary : Vector2 = get_parent().get_parent().get_global_rect().size
+@onready var tile_boundary : Vector2 = get_parent().get_node('TileContainer').get_global_rect().size
+@onready var up_boundary : int = 0
+@onready var left_boundary : int = 0
+@onready var tilesize : int = Controls.tilesize
+@onready var tile_record : Array = []
+@onready var trash_record : Array = []
+@onready var trash_tiles : Array = []
+
+var redo_response :Dictionary = {'mark':'erase'}
+var toggle : bool = false
+var highlightcolor = Color('DEEPSKY_BLUE')
+var cursorcolor = Color('DEEPSKY_BLUE')
+var fillerpos : Vector2
+
+func _ready() -> void:
+	self.set_offset(Vector2(0.5,0.5)*tilesize)
+	$marker.visible = false
+	$eraser.visible = false
+	$paint.visible = false
+
+func _process(delta) -> void:
+	running_delta += delta
+	if Controls.active:
+		_highlight_hints()
+	else:
+		return
+	#Color the cursor
+	if Controls.mode == 'Mark':
+		pass
+	elif Controls.mode == 'Chisel':
+		pass
+	else:
+		pass
+	if self_modulate == Color(1,1,1,1):
+		var sat_tween = get_tree().create_tween()
+		sat_tween.tween_property(self, \"self_modulate\", cursorcolor, 1)
+	elif self_modulate == cursorcolor:
+		var sat_tween = get_tree().create_tween()
+		sat_tween.tween_property(self, \"self_modulate\", Color(1,1,1,1), 1)
+	#Undo continuation
+	if $Timer.is_stopped():
+		if Input.is_action_pressed('backspace'):
+			if running_delta > 0.08:
+				_undo()
+				running_delta = 0
+		elif Input.is_action_pressed('space'):
+			if running_delta > 0.08:
+				_redo()
+				running_delta = 0
+	#Move the cursor
+	if Controls.active:
+		var new_position = snapped(get_viewport().get_mouse_position() - offset - get_parent().global_position, Vector2(tilesize, tilesize))
+		if new_position.x >= (0) and (new_position.x < (boundary.x)):
+			if new_position.y >= 0 and (new_position.y < boundary.y):
+				fillerpos = get_parent().get_node('Filler').get_rect().size
+				if not (new_position.x < fillerpos.x and new_position.y < fillerpos.y):
+					if !get_parent().get_parent().get_parent().get_node('SND/move').is_playing() and new_position.snapped(Vector2(tilesize,tilesize)) != snapped(position,Vector2(tilesize,tilesize)):
+						get_parent().get_parent().get_parent().get_node('SND/move').play()
+					var tween = get_tree().create_tween()
+					tween.tween_property(self, \"position\", new_position.snapped(Vector2(tilesize,tilesize)), 0.05)
+				#else: #Snap to buttons
+				#	if snapped(new_position, Vector2(24,24)) == snapped(get_parent().get_node('Filler/FillerBottom/Buttons/REDO').position, Vector2(24,24)):
+				#		var tween = get_tree().create_tween()
+				#		tween.tween_property(self, \"position\", new_position.snapped(Vector2(tilesize,tilesize)), 0.05)
+				#	else:
+				#		print(new_position, get_parent().get_node('Filler/FillerBottom/Buttons/UNDO/').get_position())
+		#Get the row/column at cursor and highlight the hints
+
+func _unhandled_input(_event: InputEvent) -> void:
+	if Input.is_action_just_pressed('backspace'):
+		_undo()
+		$Timer.start()
+	elif Input.is_action_just_pressed('space'):
+		_redo()
+		$Timer.start()
+
+func _highlight_hints() -> void:
+	var global_pos : Vector2
+	var pos : Vector2
+	#if int(get_parent().global_position.y) % Controls.tilesize  > 0:
+	#	global_pos = get_viewport().get_mouse_position()
+	#else:
+	global_pos = get_viewport().get_mouse_position() - Vector2(offset.x,offset.y) #Vector2(0,offset.y)
+	pos = position.snapped(Vector2(tilesize, tilesize))
+	if pos.x < (tile_boundary.x) and Controls.active: #highlighting hints
+		for object in get_parent().get_node('TileContainer').get_children():
+				if snappedi(object.global_position.y,tilesize) == snappedi(global_pos.y, tilesize):
+					object.set_modulate(highlightcolor)
+				else:
+					object.set_modulate(Color(1,1,1,1))
+	elif pos.y < (tile_boundary.y) and Controls.active:
+		for object in get_parent().get_node('TileContainer').get_children():
+				if snappedi(object.global_position.x,tilesize) == snappedi(global_pos.x, tilesize):
+					object.set_modulate(highlightcolor)
+				else:
+					object.set_modulate(Color(1,1,1,1))
+	else:
+		for object in get_parent().get_node('TileContainer').get_children():
+			object.set_modulate(Color(1,1,1,1))
+	if Controls.active:
+		for object in get_parent().get_node('HHintContainer/HHints').get_children():
+			if snappedi(object.global_position.y,tilesize) == snappedi(global_pos.y, tilesize):
+				object.set_self_modulate(highlightcolor)
+			else:
+				object.set_self_modulate(Color(1,1,1,1))
+		for object in get_parent().get_node('HHintContainer/Filler').get_children():
+			if snappedi(object.global_position.y,tilesize) == snappedi(global_pos.y, tilesize):
+				object.set_self_modulate(highlightcolor)
+			else:
+				object.set_self_modulate(Color(1,1,1,1))
+		for object in get_parent().get_node('VHintContainer/VHints').get_children():
+			if snappedi(object.global_position.x,tilesize) == snappedi(global_pos.x, tilesize):
+				for o in object.get_children():
+					o.set_self_modulate(highlightcolor)
+			else:
+				for o in object.get_children():
+					o.set_self_modulate(Color(1,1,1,1))
+		for object in get_parent().get_node('VHintContainer/Filler').get_children():
+			if snappedi(object.global_position.x,tilesize) == snappedi(global_pos.x, tilesize):
+				object.set_self_modulate(highlightcolor)
+			else:
+				object.set_self_modulate(Color(1,1,1,1))
+				
+func _undo():
+	if len(tile_record) > 0:
+		var cmd = tile_record[-1].record
+		if len(cmd)>1:
+			cmd = cmd[-2]
+		else:
+			cmd = cmd[-1]
+		tile_record[-1].call(cmd, true, true)
+		tile_record[-1].record.pop_back() #erase the \"undo\" action from the record
+		trash_record.append(tile_record[-1].record.pop_back()) #also erase undone action
+		if len(trash_record) == 100:
+			trash_record.pop_front()
+		tile_record.pop_back() #erase the \"undo\" action from the record
+		trash_tiles.append(tile_record.pop_back()) #also erase the undone action
+		if len(trash_tiles) == 100:
+			trash_tiles.pop_front()
+
+func _redo():
+	if len(trash_record) > 0:
+		trash_tiles[-1].call(trash_record[-1], true, true)
+		trash_tiles.pop_back()
+		trash_record.pop_back()
+
+func on_erase_signal(child_tile, redo:bool):
+	if !redo:
+		$AnimationPlayer.play('erase')
+	tile_record.append(child_tile)
+	if len(tile_record) > 100:
+		tile_record.pop_front()
+	get_parent().get_parent().get_parent().get_node('SND/erase').play()
+	
+func on_mark_signal(child_tile, redo:bool):
+	if !redo:
+		$AnimationPlayer.play('mark')
+	tile_record.append(child_tile)
+	if len(tile_record) > 100:
+		tile_record.pop_front()
+	get_parent().get_parent().get_parent().get_node('SND/mark').play()
+	
+func on_chisel_signal(child_tile, redo:bool):
+	if !redo:
+		$AnimationPlayer.play('paint')
+	tile_record.append(child_tile)
+	if len(tile_record) > 100:
+		tile_record.pop_front()
+	get_parent().get_parent().get_parent().get_node('SND/chisel').play()
+"
+
+[sub_resource type="Animation" id="Animation_76ls5"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("eraser:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(60, 80)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("eraser:visible")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [true]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("marker:visible")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [true]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("marker:position")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(60, -21)]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("paint:visible")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [true]
+}
+tracks/5/type = "value"
+tracks/5/imported = false
+tracks/5/enabled = true
+tracks/5/path = NodePath("paint:frame")
+tracks/5/interp = 1
+tracks/5/loop_wrap = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [1]
+}
+tracks/6/type = "value"
+tracks/6/imported = false
+tracks/6/enabled = true
+tracks/6/path = NodePath("paint:position")
+tracks/6/interp = 1
+tracks/6/loop_wrap = true
+tracks/6/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_qf7gk"]
+resource_name = "erase"
+length = 0.31
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("eraser:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2, 0.3, 0.31),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(20, 70), Vector2(30, 40), Vector2(20, 70), Vector2(30, 40), Vector2(32, 54)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("eraser:visible")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [true]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("marker:visible")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [false]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("paint:visible")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [false]
+}
+
+[sub_resource type="Animation" id="Animation_e4vdg"]
+resource_name = "mark"
+length = 0.31
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("marker:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.201486, 0.297507, 0.31),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(24, -8), Vector2(56, -8), Vector2(24, -8), Vector2(56, -8), Vector2(58, -24)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("marker:visible")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [true]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("eraser:visible")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [false]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("paint:visible")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [false]
+}
+
+[sub_resource type="Animation" id="Animation_oua8b"]
+resource_name = "paint"
+length = 0.31
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("paint:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [1]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("paint:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2, 0.3, 0.31),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(24, -14), Vector2(56, -10), Vector2(24, -14), Vector2(56, -10), Vector2(58, -24)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("paint:visible")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [true]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("marker:visible")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [false]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("eraser:visible")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [false]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_qgq22"]
+_data = {
+&"RESET": SubResource("Animation_76ls5"),
+&"erase": SubResource("Animation_qf7gk"),
+&"mark": SubResource("Animation_e4vdg"),
+&"paint": SubResource("Animation_oua8b")
+}
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_6cchd"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("4_76ls5")
+}, {
+"duration": 1.0,
+"texture": ExtResource("5_qgq22")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
+
+[node name="Cursor" type="Sprite2D"]
+texture = ExtResource("1_fsq4c")
+script = SubResource("GDScript_ydl3m")
+
+[node name="Timer" type="Timer" parent="."]
+wait_time = 0.15
+one_shot = true
+
+[node name="marker" type="Sprite2D" parent="."]
+z_index = 4
+position = Vector2(60, -21)
+scale = Vector2(0.8, 0.8)
+texture = ExtResource("2_e4vdg")
+
+[node name="eraser" type="Sprite2D" parent="."]
+z_index = 4
+position = Vector2(60, 80)
+scale = Vector2(0.8, 0.8)
+texture = ExtResource("3_e4vdg")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+&"": SubResource("AnimationLibrary_qgq22")
+}
+
+[node name="paint" type="AnimatedSprite2D" parent="."]
+z_index = 4
+scale = Vector2(0.8, 0.8)
+sprite_frames = SubResource("SpriteFrames_6cchd")
+frame = 1

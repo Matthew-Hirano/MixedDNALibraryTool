@@ -1,0 +1,99 @@
+[gd_scene load_steps=3 format=3 uid="uid://b08akfsmspc6j"]
+
+[ext_resource type="PackedScene" uid="uid://du44id362y1u0" path="res://picross_scenes/scenes/board.tscn" id="1_ig7tw"]
+
+[sub_resource type="GDScript" id="GDScript_0xm2m"]
+script/source = "extends Control
+
+var solved_puzzles : Dictionary
+
+func _ready() -> void:
+	read_music()
+	set_audio('TheRoadisFullofDangers.mp3', 'TheRoadisFullofDangers')
+
+func save_game():
+	var save_file = FileAccess.open(\"user://savegame.save\", FileAccess.WRITE)
+	# Call the node's save function.
+	var save_dict = {
+		\"solved\" : solved_puzzles,
+	}
+	# JSON provides a static method to serialized JSON string.
+	var json_string = JSON.stringify(save_dict)
+	# Store the save dictionary as a new line in the save file.
+	save_file.store_line(json_string)
+	
+func load_game():
+	if not FileAccess.file_exists(\"user://savegame.save\"):
+		return #Error, no save to load
+	# Load the file line by line and process that dictionary to restore
+	# the object it represents.
+	var save_file = FileAccess.open(\"user://savegame.save\", FileAccess.READ)
+	while save_file.get_position() < save_file.get_length():
+		var json_string = save_file.get_line()
+		# Creates the helper class to interact with JSON.
+		var json = JSON.new()
+
+		# Check if there is any error while parsing the JSON string, skip in case of failure.
+		var parse_result = json.parse(json_string)
+		if not parse_result == OK:
+			print(\"JSON Parse Error: \", json.get_error_message(), \" in \", json_string, \" at line \", json.get_error_line())
+			continue
+		# Get the data from the JSON object.
+		var node_data = json.data
+		# Now we set the remaining variables.
+		solved_puzzles = node_data['solved']
+	
+func erase_save()-> void:
+	if FileAccess.file_exists(\"user://savegame.save\"):
+		var dir = DirAccess.open(\"user://\")
+		dir.remove(\"user://savegame.save\")
+		solved_puzzles = {}
+
+func read_music(): 
+	var suffix = ['.mp3','.wav','.ogg']
+	var dir = DirAccess.open('user://songs')
+	if not dir: #directory is gone
+		DirAccess.open('user://').make_dir('songs')
+		print('No Directory Found')
+	else:
+		var l = dir.get_files()
+		for song in l:
+			for s in suffix:
+				if s in song:
+					print(song.split(s)[0])
+					return [song, song.split(s)[0]]
+			return [song, song]
+			print(song)
+	#Finds the songs in the music folder and displays the options to a menu
+
+func set_audio(songtitle, formatted_title):
+	var song = AudioStreamMP3.load_from_file('user://songs/%s' % songtitle)
+	$Music.stream = song
+	$Music.play()
+	#$Label.text = ('Now playing '+ formatted_title)
+	
+"
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_0xm2m")
+
+[node name="Board" parent="." instance=ExtResource("1_ig7tw")]
+
+[node name="Label" type="Label" parent="."]
+layout_mode = 1
+offset_left = -662.0
+offset_top = -348.0
+offset_right = -195.0
+offset_bottom = -247.0
+text = "A/LEFT CLICK TO PAINT, S/RIGHT CLICK TO MARK
+SPACE TO REDO, BACKSPACE TO UNDO
+SOLVE THE PICROSS PUZZLE"
+horizontal_alignment = 1

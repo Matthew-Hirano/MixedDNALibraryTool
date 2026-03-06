@@ -1,0 +1,1261 @@
+[gd_scene load_steps=34 format=3 uid="uid://cv4fkwebr1btq"]
+
+[ext_resource type="Shader" uid="uid://d1ue6b022k4qe" path="res://waves.gdshader" id="1_7fsio"]
+[ext_resource type="PackedScene" uid="uid://c7dyenoii20m0" path="res://row_scenes/m_unit.tscn" id="2_0meq5"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vgvks"]
+shader = ExtResource("1_7fsio")
+shader_parameter/bottom_color = Color(0.815686, 1, 0, 1)
+shader_parameter/top_color = Color(0.717647, 0.529412, 0.568627, 1)
+shader_parameter/wave_amp = 0.1
+shader_parameter/wave_size = 2.0
+shader_parameter/wave_time_mul = 0.15
+shader_parameter/total_phases = 12
+
+[sub_resource type="GDScript" id="GDScript_7fsio"]
+script/source = "extends ColorRect
+
+var tweens_running : bool
+var previous_color1 : Color
+var previous_color2 : Color
+var new_color1: Color
+var new_color2 : Color
+
+func _ready() -> void:
+	new_color1 = generate_random_rgb_color()
+	new_color2 = generate_random_rgb_color()
+	set_shaders_top(new_color1)
+	set_shaders_bottom(new_color2)
+
+func _process(_delta: float) -> void:
+	if !tweens_running:
+		tweens_running = true
+		previous_color1 = new_color1
+		previous_color2 = new_color2
+		new_color1 = generate_random_rgb_color()
+		new_color2 = generate_random_rgb_color()
+		#print(\"old: \", previous_color1, previous_color2)
+		#print(\"new: \", new_color1, new_color2)
+		var tween = get_tree().create_tween()
+		tween.tween_method(set_shaders_top, previous_color1, new_color1, 20)
+		tween.tween_method(set_shaders_bottom, previous_color2, new_color2, 20)
+		await tween.finished
+		tweens_running = false
+		
+func set_shaders_top( new_color : Color ) -> void:
+	self.material.set_shader_parameter(\"top_color\",new_color)
+	
+func set_shaders_bottom( new_color : Color ) -> void:
+	self.material.set_shader_parameter(\"bottom_color\",new_color)
+	
+func generate_random_rgb_color() -> Color:
+	return Color(
+		randf_range(0.0,0.7), # RED
+		randf_range(0.0,0.7), # GREEN
+		randf_range(0.0,0.7), # BLUE
+		)
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_7fsio"]
+bg_color = Color(0.62, 0.62, 0.62, 0.8)
+border_width_left = 10
+border_width_top = 10
+border_width_right = 10
+border_width_bottom = 10
+border_color = Color(0.099986, 0.099986, 0.0999859, 1)
+shadow_color = Color(0, 0, 0, 0)
+shadow_size = 6
+shadow_offset = Vector2(8, 8)
+
+[sub_resource type="GDScript" id="GDScript_3u6uo"]
+script/source = "extends Button
+
+@onready var waves: ColorRect = $\"../../../../../Waves\"
+
+func _ready() -> void:
+	$Panel.visible = true
+	$Panel.modulate.a = 0.0
+
+func _on_mouse_entered() -> void:
+	var tween = get_tree().create_tween()
+	tween.tween_property($Panel, \"modulate:a\", 1.0, 0.2)
+
+func _on_mouse_exited() -> void:
+	var tween = get_tree().create_tween()
+	tween.tween_property($Panel, \"modulate:a\", 0.0, 0.2)
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vgvks"]
+bg_color = Color(0.286721, 0.28577, 0.304126, 0.901961)
+
+[sub_resource type="GDScript" id="GDScript_3qrp7"]
+script/source = "extends Button
+
+func _on_pressed() -> void:
+	get_tree().reload_current_scene()
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0meq5"]
+bg_color = Color(0.6, 0.6, 0.6, 0)
+border_width_left = 5
+border_width_top = 6
+border_width_right = 5
+border_width_bottom = 6
+border_color = Color(1, 0, 0, 1)
+border_blend = true
+
+[sub_resource type="GDScript" id="GDScript_k5hc1"]
+script/source = "extends HBoxContainer
+
+@onready var final_mol: LineEdit = $\"../../HBoxContainer/DesiredMol/FinalMol\"
+@onready var final_vol: LineEdit = $\"../../HBoxContainer/DesiredVol/FinalVol\"
+@onready var mol_unit: OptionButton = $\"../../HBoxContainer/Molunits/LineEdit/MolConc\"
+@onready var vol_unit: OptionButton = $\"../../HBoxContainer/Molunits2/LineEdit/Volunit\"
+
+@onready var new_row_num : PackedScene = preload(\"res://row_scenes/arrange_button.tscn\")
+@onready var new_sample_button : PackedScene = preload(\"res://row_scenes/button.tscn\")
+@onready var new_sample_name : PackedScene = preload(\"res://row_scenes/name.tscn\")
+@onready var new_sample_length : PackedScene = preload(\"res://row_scenes/length.tscn\")
+@onready var new_sample_concng : PackedScene = preload(\"res://row_scenes/concng.tscn\")
+@onready var new_sample_ngunit : PackedScene = preload(\"res://row_scenes/mass_unit.tscn\")
+@onready var new_sample_concnm : PackedScene = preload(\"res://row_scenes/concnm.tscn\")
+@onready var new_sample_concmol : PackedScene = preload(\"res://row_scenes/m_unit.tscn\")
+@onready var new_sample_libperc : PackedScene = preload(\"res://row_scenes/lib_percent.tscn\")
+@onready var new_sample_vol : PackedScene = preload(\"res://row_scenes/voltoadd.tscn\")
+
+var sample_dictionary : Dictionary
+var row_number : int
+var running_delta : float = 0
+
+func _ready():
+	row_number = 0
+	_spawn_row()
+	update_dict()
+
+func update_dict() -> void:
+	sample_dictionary = {}
+	for obj in self.get_children():
+		if obj.name != \"Column0\":
+			for i in obj.get_children():
+				if \"row\" in i:
+					if i.row != 0:
+						if i.row not in sample_dictionary:
+							sample_dictionary[i.row] = []
+						sample_dictionary[i.row].append(i)
+
+func _process(_delta: float) -> void:
+	running_delta += _delta
+	if running_delta > 0.1:
+		running_delta = 0
+		update_dict()
+		for i in sample_dictionary.keys():
+			_calculate_molarity(i)
+
+func _calculate_molarity( dictionary_index : int ):
+	var concnm = float(sample_dictionary[dictionary_index][4].get_text())
+	var libp = float(sample_dictionary[dictionary_index][-3].get_text())
+	var final_m = float(final_mol.get_text()) * (mol_unit.get_selected_id())
+	var final_v = float(final_vol.get_text()) / (vol_unit.get_selected_id())
+	if final_m > 0 and final_v > 0:
+		sample_dictionary[dictionary_index][-2].text = str( snappedf( ((final_m*(libp/100.0) / concnm) * final_v), 0.0001))
+	else:
+		return
+		
+func correct_units_nm( dictionary_index : int, _prev_index: int, _unit_index : int ) -> void:
+	#if dictionary_index != -1:
+		#var old_val = float(sample_dictionary[dictionary_index][4].get_text())
+		#var new_val = str( snappedf( (old_val / pow(1000,(prev_index - unit_index)) ), 0.0001))
+		#sample_dictionary[dictionary_index][4].text = new_val
+	correct_concentration_ng( dictionary_index )
+
+func correct_concentration_nm( dictionary_index : int ) -> void:
+	if dictionary_index != -1:
+		var leng = sample_dictionary[dictionary_index][1].get_text()
+		var concng = sample_dictionary[dictionary_index][2].get_text()
+		if len(concng) > 0 and len(leng) > 0:
+			var convert_mass : float
+			var convert_moles : float
+			match sample_dictionary[dictionary_index][5].get_node(\"OptionButton\").selected:
+				0:
+					convert_moles = 0.001
+				1:
+					convert_moles = 1.0
+				2:
+					convert_moles = 1000.0
+			match sample_dictionary[dictionary_index][3].get_node(\"OptionButton\").selected:
+				0:
+					convert_mass = 1.0
+				1:
+					convert_mass = 0.001
+			#sample_dictionary[dictionary_index][4].text = str( snappedf( (float(concng) / (660*float(leng)) * convert_mass * convert_moles * 1000000), 0.0001))
+			sample_dictionary[dictionary_index][4].text = str( snappedf( (float(concng) / ((615.94*float(leng))+36.04) * convert_mass * convert_moles * 1000000), 0.0001))
+	
+func correct_units_ng( dictionary_index : int, _prev_index: int, _unit_index : int ) -> void:
+	#if dictionary_index != -1:
+	#	var old_val = float(sample_dictionary[dictionary_index][2].get_text())
+	#	var new_val = str( snappedf( (old_val / pow(1000,(prev_index - unit_index)) ), 0.0001))
+	#	sample_dictionary[dictionary_index][2].text = new_val
+	correct_concentration_nm( dictionary_index )
+	
+func correct_concentration_ng( dictionary_index : int ) -> void:
+	if dictionary_index != -1:
+		var leng = sample_dictionary[dictionary_index][1].get_text()
+		var concnm = sample_dictionary[dictionary_index][4].get_text()
+		if len(concnm) > 0 and len(leng) > 0:
+			var convert_mass : float
+			var convert_moles : float
+			match sample_dictionary[dictionary_index][5].get_node(\"OptionButton\").selected:
+				0:
+					convert_moles = 0.001
+				1:
+					convert_moles = 1.0
+				2:
+					convert_moles = 1000.0
+			match sample_dictionary[dictionary_index][3].get_node(\"OptionButton\").selected:
+				0:
+					convert_mass = 1.0
+				1:
+					convert_mass = 0.001
+			#var intermediate_val = (float(concnm) * (660.0*float(leng)) / (convert_mass * convert_moles * 1000000.0))
+			var intermediate_val = (float(concnm) * (36.04 + (615.94*float(leng))) / (convert_mass * convert_moles * 1000000.0))
+			if intermediate_val > 1000:
+				sample_dictionary[dictionary_index][2].text = str(  snappedf( intermediate_val, 0.1))
+			else:
+				sample_dictionary[dictionary_index][2].text = str(  snappedf( intermediate_val, 0.0001))
+			
+func _spawn_row():
+	row_number += 1
+	var row_num = new_row_num.instantiate()
+	row_num.row = row_number
+	$Column0.add_child(row_num)
+	var sample_button = new_sample_button.instantiate()
+	sample_button.text = ('-')
+	sample_button.row = row_number
+	if row_number == 1:
+		sample_button.text = \"+\"
+		#sample_button.set_modulate(Color(1,2,2))
+		sample_button[\"theme_override_styles/normal\"].bg_color = Color(0.25, 0.56, 0.78)
+	$Column7.add_child(sample_button)
+	var sample_name = new_sample_name.instantiate()
+	sample_name.row = row_number
+	$Column1.add_child(sample_name)
+	var sample_length = new_sample_length.instantiate()
+	sample_length.row = row_number
+	sample_length.len_changed.connect(correct_concentration_nm)
+	$Column2.add_child(sample_length)
+	var sample_concng = new_sample_concng.instantiate()
+	sample_concng.row = row_number
+	sample_concng.updated_ng.connect(correct_concentration_nm)
+	$Column3.add_child(sample_concng)
+	var sample_ngunit = new_sample_ngunit.instantiate()
+	sample_ngunit.row = row_number
+	sample_ngunit.updated_units.connect(correct_units_ng)
+	$Column35.add_child(sample_ngunit)
+	var sample_concnm = new_sample_concnm.instantiate()
+	sample_concnm.row = row_number
+	sample_concnm.updated_nm.connect(correct_concentration_ng)
+	$Column4.add_child(sample_concnm)
+	var sample_nmunit = new_sample_concmol.instantiate()
+	sample_nmunit.row = row_number
+	sample_nmunit.updated_units.connect(correct_units_nm)
+	$Column45.add_child(sample_nmunit)
+	var sample_libperc = new_sample_libperc.instantiate()
+	sample_libperc.row = row_number
+	$Column5.add_child(sample_libperc)
+	var sample_vol = new_sample_vol.instantiate()
+	sample_vol.row = row_number
+	$Column6.add_child(sample_vol)
+	sample_button.pressed_custom.connect(_button_pressed)
+	for obj in get_children():
+		if obj.name != \"Column0\":
+			if obj.find_child(\"PhiX\") != null:
+				obj.move_child(obj.get_node(\"PhiX\"), -1)
+	update_dict()
+	
+func _button_pressed( row : int ):
+	if row == 1:
+		_spawn_row()
+	else:
+		for obj in self.get_children():
+			for i in obj.get_children():
+				if \"row\" in i and i.row == row:
+					i.queue_free()
+					break
+		var label_num :int = 0
+		for b in $Column0.get_children():
+			if b is Button:
+				b.text = label_num
+				label_num += 1
+		update_dict()
+"
+
+[sub_resource type="GDScript" id="GDScript_7nty7"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_e1m55"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_5ipnb"]
+script/source = "extends LineEdit
+
+const row : int = -1
+"
+
+[sub_resource type="GDScript" id="GDScript_gs1fl"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_4sfci"]
+script/source = "extends LineEdit
+
+const row : int = -1
+"
+
+[sub_resource type="GDScript" id="GDScript_dht5u"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_8kip5"]
+script/source = "extends LineEdit
+
+const row : int = -1
+"
+
+[sub_resource type="GDScript" id="GDScript_0meq5"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_ecswc"]
+script/source = "extends LineEdit
+
+const row : int = -1
+"
+
+[sub_resource type="GDScript" id="GDScript_t47p0"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_cvpfm"]
+script/source = "extends LineEdit
+
+const row : int = -1
+"
+
+[sub_resource type="GDScript" id="GDScript_fx0ic"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_b6if4"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_p8h1g"]
+script/source = "extends LineEdit
+
+const row : int = -1
+"
+
+[sub_resource type="GDScript" id="GDScript_nf4lj"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_h4h0o"]
+script/source = "extends LineEdit
+
+const row : int = -1
+"
+
+[sub_resource type="GDScript" id="GDScript_3b8kr"]
+script/source = "extends Label
+
+const row = 0
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fx0ic"]
+resource_local_to_scene = true
+bg_color = Color(0.6, 0.084, 0.084, 1)
+
+[sub_resource type="GDScript" id="GDScript_vgvks"]
+resource_local_to_scene = true
+script/source = "extends Button
+
+const row : int = -1
+
+@onready var spreadsheet: HBoxContainer = $\"../..\"
+
+func _on_pressed() -> void:
+	for obj in spreadsheet.get_children():
+		var phix = obj.find_child(\"PhiX\")
+		if phix != null:
+			phix.queue_free()
+
+func _ready() -> void:
+	var f: StyleBoxFlat = get_theme_stylebox(\"focus\")
+	f.expand_margin_bottom = 0
+	f.expand_margin_left = 0
+	f.expand_margin_right = 0
+	f.expand_margin_top = 0
+"
+
+[sub_resource type="GDScript" id="GDScript_7kimb"]
+script/source = "extends LineEdit
+
+@onready var column_5: VBoxContainer = $\"../../../ScrollContainer/Spreadsheet/Column5\"
+var prev_value : float
+
+func _ready() -> void:
+	$PopupPanel.modulate.a = 0
+	$PanelContainer.visible = false
+
+func _process(_delta: float) -> void:
+	var running_sum : float = 0.0
+	for line in column_5.get_children():
+		if line is LineEdit:
+			running_sum += float(line.text)
+	self.text = str(running_sum)
+	if running_sum != prev_value:
+		if running_sum > 100:
+			$PanelContainer.visible = true
+			var tween = get_tree().create_tween()
+			tween.tween_property($PopupPanel, \"modulate:a\", 1.0, 0.2)
+		else:
+			$PanelContainer.visible = false
+			var tween = get_tree().create_tween()
+			tween.tween_property($PopupPanel, \"modulate:a\", 0.0, 0.2)
+		prev_value = running_sum
+"
+
+[sub_resource type="GDScript" id="GDScript_eudgn"]
+script/source = "extends LineEdit
+
+@onready var column_6: VBoxContainer = $\"../../../../ScrollContainer/Spreadsheet/Column6\"
+@onready var final_vol: LineEdit = $\"../../../../HBoxContainer/DesiredVol/FinalVol\"
+@onready var volunit: OptionButton = $\"../../../../HBoxContainer/Molunits2/LineEdit/Volunit\"
+@onready var h_2o: LineEdit = $\"../../H2O/H2O\"
+@onready var line_edit_3: LineEdit = $\"../../TotalLib/LineEdit3\"
+
+@onready var panel1: PanelContainer = $PanelContainer
+@onready var panel2: PanelContainer = $\"../../../../HBoxContainer/DesiredVol/FinalVol/PanelContainer\"
+
+var prev_value : float
+
+func _ready() -> void:
+	panel1.visible = false
+	panel2.visible = false
+	$PopupPanel.modulate.a = 0
+
+func _process(_delta: float) -> void:
+	var running_sum : float = 0.0
+	for line in column_6.get_children():
+		if line is LineEdit:
+			running_sum += float(line.text)
+	self.text = str(running_sum)
+	if running_sum != prev_value:
+		if running_sum > (float(final_vol.text) / (0.001 * volunit.get_selected_id())):
+			h_2o.text = \"nan\"
+			line_edit_3.text = str(float(h_2o.text))
+			var tween = get_tree().create_tween()
+			tween.tween_property($PopupPanel, \"modulate:a\", 1.0, 0.2)
+			panel1.visible = true
+			panel2.visible = true
+		else:
+			h_2o.text = str((float(final_vol.text) / (0.001 * volunit.get_selected_id())) - float(running_sum))
+			line_edit_3.text = str(float(h_2o.text) + running_sum)
+			var tween = get_tree().create_tween()
+			tween.tween_property($PopupPanel, \"modulate:a\", 0.0, 0.2)
+			panel1.visible = false
+			panel2.visible = false
+		prev_value = running_sum
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k5hc1"]
+bg_color = Color(0.313726, 0.305882, 0.298039, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
+
+[sub_resource type="GDScript" id="GDScript_5mk08"]
+script/source = "extends Panel
+
+func _process(_delta: float) -> void:
+	if Buttondrag.dragging:
+		self.position = get_viewport().get_mouse_position()
+		self.modulate.a = 0.5
+		$Label.text = Buttondrag.current_button.text
+	else:
+		self.modulate.a = 0
+	
+"
+
+[node name="tool_interface" type="Node2D"]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="Waves" type="ColorRect" parent="CanvasLayer"]
+material = SubResource("ShaderMaterial_vgvks")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_7fsio")
+
+[node name="Control" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="CanvasLayer/Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 88.0
+offset_right = -88.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_7fsio")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Control/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 23.0
+offset_right = -23.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Spacer1" type="HBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+size_flags_stretch_ratio = 0.3
+mouse_filter = 0
+alignment = 1
+
+[node name="Spacer2" type="HBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 4
+size_flags_stretch_ratio = 0.3
+mouse_filter = 0
+alignment = 1
+
+[node name="Howtouse" type="Button" parent="CanvasLayer/Control/Panel/VBoxContainer/Spacer2"]
+layout_mode = 2
+text = "How to use"
+script = SubResource("GDScript_3u6uo")
+
+[node name="Panel" type="Panel" parent="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse"]
+visible = false
+z_index = 4
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -638.0
+offset_top = 32.0
+offset_bottom = 190.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_vgvks")
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "First, define the desired total concentration and volume of the mixed library in the first row. Then, fill out rows with your sample info, using the right side buttons to add/remove rows, and left side buttons to re-arrange them.
+If DNA length and concentration in mass are entered, the tool will automatically convert it to molarity, and vice-versa. Only molarity is used in the final volume calculation.
+Hover over labels for more information."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Howtouse2" type="Button" parent="CanvasLayer/Control/Panel/VBoxContainer/Spacer2"]
+layout_mode = 2
+text = "About"
+script = SubResource("GDScript_3u6uo")
+
+[node name="Panel" type="Panel" parent="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse2"]
+visible = false
+z_index = 4
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 32.0
+offset_right = 561.0
+offset_bottom = 190.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_vgvks")
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse2/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "This tool is meant to help in preparing mixed, double-stranded DNA mixed libraries of varying molarities for uses such as high-throughput sequencing.
+Molar calculation formula is from NEB, where the molarity is calculated assuming a molecular weight of 615.94 g/mol/bp + 36.04 g/mol. 
+
+Created by Matthew Hirano, Seelig Lab, University of Washington"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="Button" type="Button" parent="CanvasLayer/Control/Panel/VBoxContainer/Spacer2"]
+layout_mode = 2
+text = "RESET"
+icon_alignment = 2
+expand_icon = true
+script = SubResource("GDScript_3qrp7")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 8
+mouse_filter = 0
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="DesiredMol" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/DesiredMol"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Desired Final Molarity"
+horizontal_alignment = 1
+
+[node name="RichTextLabel" type="RichTextLabel" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/DesiredMol/Label"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/default_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/normal_font_size = 20
+bbcode_enabled = true
+text = "[hint=\"Enter the overall DNA concentration ofthe
+mixed library that you want to make.\"]FILLERFILLERFILLERFILLER[/hint]"
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="FinalMol" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/DesiredMol"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+
+[node name="Molunits" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/Molunits"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Unit"
+horizontal_alignment = 1
+
+[node name="LineEdit" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/Molunits"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 3
+editable = false
+
+[node name="MolConc" type="OptionButton" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/Molunits/LineEdit"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+selected = 0
+item_count = 2
+popup/item_0/text = "nM"
+popup/item_0/id = 1000
+popup/item_1/text = "pM"
+popup/item_1/id = 1
+
+[node name="DesiredVol" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/DesiredVol"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Desired Final Volume"
+horizontal_alignment = 1
+
+[node name="RichTextLabel" type="RichTextLabel" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/DesiredVol/Label"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/default_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/normal_font_size = 20
+bbcode_enabled = true
+text = "[hint=\"Enter the total volume of the mixed library that you want to make.\"]FILLERFILLERFILLERFILLER[/hint]"
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="FinalVol" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/DesiredVol"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/DesiredVol/FinalVol"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_0meq5")
+
+[node name="Molunits2" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/Molunits2"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Unit"
+horizontal_alignment = 1
+
+[node name="LineEdit" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/Molunits2"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 3
+editable = false
+
+[node name="Volunit" type="OptionButton" parent="CanvasLayer/Control/Panel/VBoxContainer/HBoxContainer/Molunits2/LineEdit"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+selected = 1
+allow_reselect = true
+item_count = 2
+popup/item_0/text = "mL"
+popup/item_0/id = 1
+popup/item_1/text = "μL"
+popup/item_1/id = 1000
+
+[node name="ScrollContainer" type="ScrollContainer" parent="CanvasLayer/Control/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 0
+
+[node name="Spreadsheet" type="HBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 0
+theme_override_constants/separation = 8
+script = SubResource("GDScript_k5hc1")
+
+[node name="Column0" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+mouse_filter = 0
+
+[node name="Spacer" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column0"]
+modulate = Color(1, 1, 1, 0)
+layout_mode = 2
+size_flags_vertical = 0
+mouse_filter = 0
+theme_override_font_sizes/font_size = 18
+text = "/"
+script = SubResource("GDScript_7nty7")
+
+[node name="Column1" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SampleName" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column1"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Sample Name"
+horizontal_alignment = 1
+script = SubResource("GDScript_e1m55")
+
+[node name="RichTextLabel" type="RichTextLabel" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column1/SampleName"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/default_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/normal_font_size = 20
+bbcode_enabled = true
+text = "[hint=\"Add a name for each sample.\"]FILLERFILLERFILLERFILLER[/hint]"
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PhiX" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column1"]
+custom_minimum_size = Vector2(250, 40)
+layout_mode = 2
+theme_override_colors/font_uneditable_color = Color(1, 1, 1, 1)
+text = "PhiX"
+editable = false
+script = SubResource("GDScript_5ipnb")
+
+[node name="Column2" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+
+[node name="Length" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column2"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Length (bp)"
+horizontal_alignment = 1
+script = SubResource("GDScript_gs1fl")
+
+[node name="RichTextLabel" type="RichTextLabel" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column2/Length"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/default_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/normal_font_size = 20
+bbcode_enabled = true
+text = "[hint=\"Enter the length of the DNA to calculate molarity. Wider distributions
+within a library will decrease calculated concentration accuracy.\"]FILLERFILLERFILLERFILLER[/hint]"
+scroll_active = false
+autowrap_mode = 0
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PhiX" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column2"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+editable = false
+script = SubResource("GDScript_4sfci")
+
+[node name="Column3" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Conc" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column3"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Concentration (mass)"
+horizontal_alignment = 1
+script = SubResource("GDScript_dht5u")
+
+[node name="RichTextLabel" type="RichTextLabel" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column3/Conc"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -1.0
+offset_bottom = -1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/default_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/normal_font_size = 20
+bbcode_enabled = true
+text = "[hint=\"Enter a concentration in nanograms per microliter to calculate molarity.\"]FILLERFILLERFILLERFILLER[/hint]"
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PhiX" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column3"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+editable = false
+script = SubResource("GDScript_8kip5")
+
+[node name="Column35" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column35"]
+modulate = Color(1, 1, 1, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "/"
+horizontal_alignment = 1
+script = SubResource("GDScript_0meq5")
+
+[node name="PhiX" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column35"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+editable = false
+script = SubResource("GDScript_ecswc")
+
+[node name="Column4" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Conc" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column4"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Concentration (molarity)"
+horizontal_alignment = 1
+script = SubResource("GDScript_t47p0")
+
+[node name="RichTextLabel" type="RichTextLabel" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column4/Conc"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/default_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/normal_font_size = 20
+bbcode_enabled = true
+text = "[hint=\"The molarity is automatically calculated from length
+and mass, or may be manually entered..\"]FILLERFILLERFILLERFILLER[/hint]"
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PhiX" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column4"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+placeholder_text = "Optional"
+script = SubResource("GDScript_cvpfm")
+
+[node name="Column45" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column45"]
+modulate = Color(1, 1, 1, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "/"
+horizontal_alignment = 1
+script = SubResource("GDScript_fx0ic")
+
+[node name="PhiX" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column45" instance=ExtResource("2_0meq5")]
+layout_mode = 2
+row = -1
+
+[node name="Column5" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+
+[node name="Library" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column5"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Library %"
+horizontal_alignment = 1
+script = SubResource("GDScript_b6if4")
+
+[node name="RichTextLabel" type="RichTextLabel" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column5/Library"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/default_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/normal_font_size = 20
+bbcode_enabled = true
+text = "[hint=\"Enter the percent of the total library that you want to represent this sample.\"]FILLERFILLERFILLERFILLER[/hint]"
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PhiX" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column5"]
+custom_minimum_size = Vector2(80, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+placeholder_text = "Optional"
+script = SubResource("GDScript_p8h1g")
+
+[node name="Column6" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+
+[node name="Label3" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column6"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Sample Volume (μL)"
+horizontal_alignment = 1
+script = SubResource("GDScript_nf4lj")
+
+[node name="RichTextLabel" type="RichTextLabel" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column6/Label3"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/default_color = Color(0, 0, 0, 0)
+theme_override_font_sizes/normal_font_size = 20
+bbcode_enabled = true
+text = "[hint=\"This is the volume of each sample to add at the entered concentration. If the volume is too high, consider reducing the Desired Final Volume.\"]FILLERFILLERFILLERFILLER[/hint]"
+scroll_active = false
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PhiX" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column6"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_colors/font_uneditable_color = Color(1, 1, 1, 1)
+editable = false
+script = SubResource("GDScript_h4h0o")
+
+[node name="Column7" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
+layout_mode = 2
+size_flags_horizontal = 8
+
+[node name="Spacer" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column7"]
+modulate = Color(1, 1, 1, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "/"
+script = SubResource("GDScript_3b8kr")
+
+[node name="PhiX" type="Button" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column7"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_fx0ic")
+text = "-"
+script = SubResource("GDScript_vgvks")
+
+[node name="Volumes" type="HBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 4
+theme_override_constants/separation = 8
+
+[node name="Spacer" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Spacer2" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Spacer3" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Spacer4" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LibSums" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TotalLib" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/LibSums"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Total %"
+horizontal_alignment = 1
+
+[node name="LineEdit" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/LibSums"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_colors/font_uneditable_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+placeholder_text = "= 100"
+alignment = 1
+editable = false
+script = SubResource("GDScript_7kimb")
+
+[node name="PopupPanel" type="Panel" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/LibSums/LineEdit"]
+layout_mode = 0
+offset_left = -379.0
+offset_top = -19.0
+offset_right = -29.0
+offset_bottom = 61.0
+
+[node name="RichTextLabel" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/LibSums/LineEdit/PopupPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -171.0
+offset_top = -36.0
+offset_right = 171.0
+offset_bottom = 36.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 16
+text = "The sum of all sample \"Library %\"
+values must be 100 exactly."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/LibSums/LineEdit"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_0meq5")
+
+[node name="Volumes" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="TotalVol" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes"]
+custom_minimum_size = Vector2(175, 0)
+layout_mode = 2
+
+[node name="Label2" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes/TotalVol"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Total Sample Volume"
+horizontal_alignment = 1
+
+[node name="LineEdit" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes/TotalVol"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_colors/font_uneditable_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+alignment = 1
+editable = false
+script = SubResource("GDScript_eudgn")
+
+[node name="PopupPanel" type="Panel" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes/TotalVol/LineEdit"]
+layout_mode = 0
+offset_left = -383.0
+offset_top = 83.0
+offset_right = -33.0
+offset_bottom = 163.0
+
+[node name="RichTextLabel" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes/TotalVol/LineEdit/PopupPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -171.0
+offset_top = -36.0
+offset_right = 171.0
+offset_bottom = 36.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 16
+text = "The sum of all sample volumes cannot
+be more than the Desired Final Volume."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes/TotalVol/LineEdit"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_0meq5")
+
+[node name="H2O" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes"]
+layout_mode = 2
+
+[node name="H2OVol" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes/H2O"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "H2O Volume to add"
+horizontal_alignment = 1
+
+[node name="H2O" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes/H2O"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_colors/font_uneditable_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+alignment = 1
+editable = false
+
+[node name="TotalLib" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes"]
+visible = false
+layout_mode = 2
+
+[node name="Label3" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes/TotalLib"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Total Library Volume"
+horizontal_alignment = 1
+
+[node name="LineEdit3" type="LineEdit" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes/Volumes/TotalLib"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_override_colors/font_uneditable_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+placeholder_text = "Sample + H2O"
+alignment = 1
+editable = false
+
+[node name="Spacer5" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes"]
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Spacer3" type="HBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+size_flags_stretch_ratio = 0.3
+mouse_filter = 0
+alignment = 1
+
+[node name="Drag" type="Panel" parent="CanvasLayer/Control"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_k5hc1")
+script = SubResource("GDScript_5mk08")
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Drag"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 18
+text = "1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[connection signal="mouse_entered" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse" to="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse" to="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse" method="_on_mouse_exited"]
+[connection signal="mouse_entered" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse2" to="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse2" method="_on_mouse_entered"]
+[connection signal="mouse_exited" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse2" to="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse2" method="_on_mouse_exited"]
+[connection signal="pressed" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Button" to="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Button" method="_on_pressed"]
+[connection signal="pressed" from="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column7/PhiX" to="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column7/PhiX" method="_on_pressed"]

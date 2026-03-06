@@ -1,0 +1,93 @@
+[gd_scene load_steps=4 format=3 uid="uid://bnevq54bg12dd"]
+
+[ext_resource type="Texture2D" uid="uid://c5a3wnrhu1ake" path="res://picross_scenes/images/puzzle_icon.png" id="1_1e5pu"]
+
+[sub_resource type="GDScript" id="GDScript_1e5pu"]
+script/source = "extends Node2D
+
+@export var new_w : PackedScene = preload(\"res://picross_scenes/scenes/window.tscn\")
+
+@export var key : String = 'Dolphin'
+
+signal puzzle_spawn
+signal puzzle_gone
+@onready var waves: ColorRect = $\"../Waves\"
+
+var pressed : bool
+
+func _process(_delta: float) -> void:
+	#$Sprite2D.modulate = waves.previous_color1
+	pass
+	
+func _ready() -> void:
+	set_puzzle()
+	
+func set_puzzle() -> void:
+	key = PuzzleIndex.puzzle_dict.keys()[randi_range(0,len(PuzzleIndex.puzzle_dict.keys())-1)]
+	
+	self.pressed = false
+	self.visible = true
+	self.position.x = -100
+	
+	self.position.y = randi_range(0, DisplayServer.screen_get_size().y)
+	var destination_x = randi_range(DisplayServer.screen_get_size().x, DisplayServer.screen_get_size().x + 500)
+	var destination_y = randi_range(0, DisplayServer.screen_get_size().y)
+	var tween = get_tree().create_tween()
+	tween.tween_property(self, \"position\", Vector2(destination_x, destination_y), 20)
+	var tween2 = get_tree().create_tween()
+	tween2.tween_property(self, \"rotation\", randi_range(6,20), 20)
+	await tween.finished
+	self.visible = false
+	if !pressed:
+		puzzle_gone.emit()
+	
+func _on_button_pressed() -> void:
+	if get_parent().get_parent().find_child(\"Window\") == null:
+		var new_window = new_w.instantiate()
+		puzzle_spawn.connect(new_window._on_nazo_spawn_puzzle_spawn)
+		new_window.close_requested.connect(_on_window_close_requested)
+		get_parent().get_parent().add_child(new_window)
+	puzzle_spawn.emit( key )
+	self.visible = false
+	self.pressed = true
+
+func _on_bg_effects_toggled(toggled_on: bool) -> void:
+	if !toggled_on:
+		self.visible = false
+	else:
+		self.visible = true
+
+func _on_puzzle_gone() -> void:
+	set_puzzle()
+
+func _on_window_close_requested() -> void:
+	set_puzzle()
+"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_e4x37"]
+bg_color = Color(0.6, 0.6, 0.6, 0)
+border_color = Color(0.8, 0.8, 0.8, 0)
+
+[node name="NazoSpawn" type="Node2D"]
+script = SubResource("GDScript_1e5pu")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+self_modulate = Color(0, 0, 0, 0.2)
+texture = ExtResource("1_1e5pu")
+
+[node name="Button" type="Button" parent="Sprite2D"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -10.0
+offset_top = -10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_default_cursor_shape = 2
+theme_override_styles/focus = SubResource("StyleBoxFlat_e4x37")
+flat = true
+
+[connection signal="puzzle_gone" from="." to="." method="_on_puzzle_gone"]
+[connection signal="pressed" from="Sprite2D/Button" to="." method="_on_button_pressed"]

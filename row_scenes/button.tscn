@@ -1,0 +1,35 @@
+[gd_scene load_steps=3 format=3 uid="uid://726m6wdfybs4"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ae4bs"]
+resource_local_to_scene = true
+bg_color = Color(0.6, 0.084, 0.084, 1)
+
+[sub_resource type="GDScript" id="GDScript_ae4bs"]
+script/source = "extends Button
+
+@export var row : int
+
+signal pressed_custom
+
+func _on_pressed() -> void:
+	pressed_custom.emit( self.row )
+
+func _ready() -> void:
+	var f: StyleBoxFlat = get_theme_stylebox(\"focus\")
+	f.expand_margin_bottom = 0
+	f.expand_margin_left = 0
+	f.expand_margin_right = 0
+	f.expand_margin_top = 0
+"
+
+[node name="Sample1" type="Button"]
+custom_minimum_size = Vector2(40, 40)
+offset_right = 40.0
+offset_bottom = 40.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_styles/normal = SubResource("StyleBoxFlat_ae4bs")
+text = "+"
+expand_icon = true
+script = SubResource("GDScript_ae4bs")
+
+[connection signal="pressed" from="." to="." method="_on_pressed"]

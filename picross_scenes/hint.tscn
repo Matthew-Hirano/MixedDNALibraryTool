@@ -1,0 +1,102 @@
+[gd_scene load_steps=4 format=3 uid="uid://bk5c362yu3ybu"]
+
+[ext_resource type="FontFile" uid="uid://t0ovx2qyuxxw" path="res://picross_scenes/images/square-deal.ttf" id="1_ir5rp"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dg8ih"]
+resource_local_to_scene = true
+bg_color = Color(0.991164, 0.991164, 0.991164, 1)
+
+[sub_resource type="GDScript" id="GDScript_dg8ih"]
+script/source = "extends Panel
+
+@export var inactive : bool = false
+@onready var marked : bool = false
+@onready var record = []
+
+signal erase_signal()
+signal mark_signal()
+
+func _ready() -> void:
+	set_custom_minimum_size(Vector2(1,1)*Controls.tilesize)
+	$RichTextLabel.add_theme_font_size_override(\"normal_font_size\", Controls.tilesize * 0.9)
+	
+func _on_control_gui_input(event: InputEvent) -> void:
+	if Controls.active:
+		if event is InputEventMouseButton and event.pressed:
+			mark(true, false)
+
+func mark( firstpress : bool, redo : bool ) -> void:
+	if !marked:
+		record.append('mark')
+		if len(record) > 100:
+			record.pop_front()
+		mark_signal.emit(self, redo)
+		get_node('RichTextLabel')[\"theme_override_colors/default_color\"] = Color(1,0,0,1)
+		marked = true
+		if firstpress:
+			Controls.mode = \"Mark\"
+	elif firstpress:
+		erase(true, redo)
+		
+func erase(firstpress:bool, redo:bool) -> void:
+	if marked:
+		record.append('mark')
+		if len(record) > 100:
+			record.pop_front()
+		erase_signal.emit(self, redo)
+		get_node('RichTextLabel')[\"theme_override_colors/default_color\"] = Color(0,0,0,1)
+		marked = false
+		if firstpress:
+			Controls.mode = 'Erase'
+	elif firstpress:
+		mark(true, redo)
+"
+
+[node name="hint" type="Panel"]
+clip_contents = true
+custom_minimum_size = Vector2(36, 36)
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -18.0
+offset_top = -18.0
+offset_right = 18.0
+offset_bottom = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_dg8ih")
+script = SubResource("GDScript_dg8ih")
+
+[node name="RichTextLabel" type="RichTextLabel" parent="."]
+z_index = 1
+layout_direction = 3
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 4.0
+offset_bottom = 4.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/default_color = Color(0, 0, 0, 1)
+theme_override_fonts/normal_font = ExtResource("1_ir5rp")
+theme_override_font_sizes/normal_font_size = 36
+fit_content = true
+autowrap_mode = 0
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Control" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+
+[connection signal="gui_input" from="Control" to="." method="_on_control_gui_input"]
