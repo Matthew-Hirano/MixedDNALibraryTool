@@ -64,8 +64,8 @@ func _ready():
 	get_node('PuzzleBox/UberContainer/TileContainer').set_columns(len(z[0]))
 	get_node(\"PuzzleBox/UberContainer/Cursor\").tile_boundary = Vector2(len(z[0]),len(z)) * tilesize
 	get_node('PuzzleBox/UberContainer/HHintContainer/HHints').set_columns(max_h.max())
-	get_node('PuzzleBox/UberContainer/Cursor').up_boundary = -tilesize * max_v.max()
-	get_node('PuzzleBox/UberContainer/Cursor').left_boundary = -tilesize * max_h.max()
+	get_node('PuzzleBox/UberContainer/Cursor').up_boundary = $PuzzleBox.size.y - 240  #-tilesize * max_v.max()
+	get_node('PuzzleBox/UberContainer/Cursor').left_boundary = $PuzzleBox.size.x - 240 #-tilesize * max_h.max()
 	get_node('PuzzleBox/UberContainer/Filler/FillerBottom/HowToPlay').visible = true
 	get_node('PuzzleBox/UberContainer/Filler/FillerBottom/Buttons').visible = true
 	get_node('PuzzleBox/UberContainer/Filler/FillerBottom/Label').visible = false
@@ -155,8 +155,9 @@ func _ready():
 			flip = false
 		else:
 			flip = true
-	$PuzzleBox.size.x = (len(z[0]) * tilesize) * 2
-	$PuzzleBox.size.y = (len(z) * tilesize) * 2
+	$PuzzleBox.size.x = (len(z[0]) * tilesize) + 240
+	$PuzzleBox.size.y = (len(z) * tilesize) + 240
+	$PuzzleBox/UberContainer/Cursor.boundary = $PuzzleBox.size
 	if get_parent() is Window:
 		get_parent().size = $PuzzleBox.size
 
@@ -406,14 +407,12 @@ shader_parameter/palette_mode = 0
 [node name="Board" type="Control"]
 layout_mode = 3
 anchors_preset = 0
-size_flags_horizontal = 4
-size_flags_vertical = 4
 script = SubResource("GDScript_4mug4")
 
 [node name="PuzzleBox" type="PanelContainer" parent="."]
 layout_mode = 0
-offset_right = 720.0
-offset_bottom = 720.0
+offset_right = 400.0
+offset_bottom = 400.0
 mouse_filter = 2
 
 [node name="bgColor" type="ColorRect" parent="PuzzleBox"]

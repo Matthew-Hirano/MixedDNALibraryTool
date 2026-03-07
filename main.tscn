@@ -833,7 +833,7 @@ mouse_filter = 2
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-mouse_filter = 0
+mouse_filter = 2
 theme_override_constants/separation = 8
 script = SubResource("GDScript_k5hc1")
 
@@ -853,6 +853,7 @@ script = SubResource("GDScript_7nty7")
 [node name="Column1" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
 
 [node name="SampleName" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column1"]
 layout_mode = 2
@@ -886,6 +887,7 @@ script = SubResource("GDScript_5ipnb")
 
 [node name="Column2" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
 layout_mode = 2
+mouse_filter = 2
 
 [node name="Length" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column2"]
 layout_mode = 2
@@ -920,6 +922,7 @@ script = SubResource("GDScript_4sfci")
 [node name="Column3" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
 
 [node name="Conc" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column3"]
 layout_mode = 2
@@ -953,6 +956,7 @@ script = SubResource("GDScript_8kip5")
 
 [node name="Column35" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
 layout_mode = 2
+mouse_filter = 2
 
 [node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column35"]
 modulate = Color(1, 1, 1, 0)
@@ -971,6 +975,7 @@ script = SubResource("GDScript_ecswc")
 [node name="Column4" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
 
 [node name="Conc" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column4"]
 layout_mode = 2
@@ -1004,6 +1009,7 @@ script = SubResource("GDScript_cvpfm")
 
 [node name="Column45" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
 layout_mode = 2
+mouse_filter = 2
 
 [node name="Label" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column45"]
 modulate = Color(1, 1, 1, 0)
@@ -1019,6 +1025,7 @@ row = -1
 
 [node name="Column5" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
 layout_mode = 2
+mouse_filter = 2
 
 [node name="Library" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column5"]
 layout_mode = 2
@@ -1051,6 +1058,7 @@ script = SubResource("GDScript_p8h1g")
 
 [node name="Column6" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet"]
 layout_mode = 2
+mouse_filter = 2
 
 [node name="Label3" type="Label" parent="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column6"]
 layout_mode = 2
@@ -1103,6 +1111,7 @@ script = SubResource("GDScript_vgvks")
 layout_mode = 2
 size_flags_horizontal = 8
 size_flags_vertical = 4
+mouse_filter = 2
 theme_override_constants/separation = 8
 
 [node name="Spacer" type="VBoxContainer" parent="CanvasLayer/Control/Panel/VBoxContainer/Volumes"]
@@ -1304,9 +1313,18 @@ text = "1"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Window" parent="." instance=ExtResource("4_1bvp3")]
+[node name="CanvasLayer2" type="CanvasLayer" parent="."]
+follow_viewport_enabled = true
 
-[connection signal="puzzle_spawn" from="CanvasLayer/NazoSpawn" to="Window" method="_on_nazo_spawn_puzzle_spawn"]
+[node name="Window" parent="CanvasLayer2" instance=ExtResource("4_1bvp3")]
+position = Vector2i(200, 105)
+size = Vector2i(500, 500)
+visible = false
+unresizable = false
+keep_title_visible = true
+content_scale_mode = 1
+
+[connection signal="puzzle_spawn" from="CanvasLayer/NazoSpawn" to="CanvasLayer2/Window" method="_on_nazo_spawn_puzzle_spawn"]
 [connection signal="mouse_entered" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse" to="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse" method="_on_mouse_entered"]
 [connection signal="mouse_exited" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse" to="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse" method="_on_mouse_exited"]
 [connection signal="mouse_entered" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse2" to="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/Howtouse2" method="_on_mouse_entered"]
@@ -1315,4 +1333,4 @@ vertical_alignment = 1
 [connection signal="toggled" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/BG_effects" to="CanvasLayer/Waves" method="_on_bg_effects_toggled"]
 [connection signal="toggled" from="CanvasLayer/Control/Panel/VBoxContainer/Spacer2/BG_effects" to="CanvasLayer/NazoSpawn" method="_on_bg_effects_toggled"]
 [connection signal="pressed" from="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column7/PhiX" to="CanvasLayer/Control/Panel/VBoxContainer/ScrollContainer/Spreadsheet/Column7/PhiX" method="_on_pressed"]
-[connection signal="close_requested" from="Window" to="CanvasLayer/NazoSpawn" method="_on_window_close_requested"]
+[connection signal="close_requested" from="CanvasLayer2/Window" to="CanvasLayer/NazoSpawn" method="_on_window_close_requested"]
